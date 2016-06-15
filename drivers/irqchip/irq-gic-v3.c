@@ -25,6 +25,7 @@
 #include <linux/percpu.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/wakeup_reason.h>
 
 #include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic-v3.h>
@@ -450,6 +451,8 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		if (75 == irq || 12 == irq || 199 == irq)
 			continue;
 #endif
+
+		log_base_wakeup_reason(irq);
 
 		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
 	}
