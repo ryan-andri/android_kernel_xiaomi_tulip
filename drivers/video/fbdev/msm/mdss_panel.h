@@ -1033,6 +1033,7 @@ struct mdss_panel_data {
 
 	int panel_te_gpio;
 	bool is_te_irq_enabled;
+	struct mutex te_mutex;
 	struct completion te_done;
 
 #ifdef CONFIG_MACH_MI
@@ -1056,6 +1057,7 @@ static inline void panel_update_te_irq(struct mdss_panel_data *pdata,
 		return;
 	}
 
+	mutex_lock(&pdata->te_mutex);
 	if (enable && !pdata->is_te_irq_enabled) {
 		enable_irq(gpio_to_irq(pdata->panel_te_gpio));
 		pdata->is_te_irq_enabled = true;
@@ -1063,6 +1065,8 @@ static inline void panel_update_te_irq(struct mdss_panel_data *pdata,
 		disable_irq(gpio_to_irq(pdata->panel_te_gpio));
 		pdata->is_te_irq_enabled = false;
 	}
+	mutex_unlock(&pdata->te_mutex);
+
 }
 
 /**
