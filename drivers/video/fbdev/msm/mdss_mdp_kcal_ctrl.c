@@ -94,12 +94,11 @@ static int mdss_mdp_kcal_display_commit(void)
 	return ret;
 }
 
-static void mdss_mdp_kcal_update_pcc(struct kcal_lut_data *lut_data)
+static int mdss_mdp_kcal_update_pcc(struct kcal_lut_data *lut_data)
 {
 	u32 copyback = 0;
 	struct mdp_pcc_cfg_data pcc_config;
-
-	struct mdp_pcc_data_v1_7 *payload;
+	struct mdp_pcc_data_v1_7 *payload = NULL;
 
 	lut_data->red = lut_data->red < lut_data->minimum ?
 		lut_data->minimum : lut_data->red;
@@ -119,27 +118,38 @@ static void mdss_mdp_kcal_update_pcc(struct kcal_lut_data *lut_data)
 	pcc_config.g.g = lut_data->green * PCC_ADJ;
 	pcc_config.b.b = lut_data->blue * PCC_ADJ;
 
-	payload = kzalloc(sizeof(struct mdp_pcc_data_v1_7),GFP_USER);
+	payload = kzalloc(sizeof(struct mdp_pcc_data_v1_7), GFP_USER);
+	if (!payload) {
+		pr_err("%s: failed to allocate memory for update pcc\n", __func__);
+		return -ENOMEM;
+	}
+
 	payload->r.r = pcc_config.r.r;
 	payload->g.g = pcc_config.g.g;
 	payload->b.b = pcc_config.b.b;
 	pcc_config.cfg_payload = payload;
 
-	if (!mdss_mdp_kcal_store_fb0_ctl()) return;
+	if (!mdss_mdp_kcal_store_fb0_ctl()) {
+		kfree(payload);
+		return 0;
+	}
+
 	mdss_mdp_pcc_config(fb0_ctl->mfd, &pcc_config, &copyback);
+
 	kfree(payload);
+	return 0;
 }
 
-static void mdss_mdp_kcal_update_pa(struct kcal_lut_data *lut_data)
+static int mdss_mdp_kcal_update_pa(struct kcal_lut_data *lut_data)
 {
 	u32 copyback = 0;
 	struct mdp_pa_cfg_data pa_config;
 	struct mdp_pa_v2_cfg_data pa_v2_config;
-	struct mdp_pa_data_v1_7 *payload;
-
+	struct mdp_pa_data_v1_7 *payload = NULL;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
-	if (!mdss_mdp_kcal_store_fb0_ctl()) return;
+	if (!mdss_mdp_kcal_store_fb0_ctl())
+		return 0;
 
 	if (mdata->mdp_rev < MDSS_MDP_HW_REV_103) {
 		memset(&pa_config, 0, sizeof(struct mdp_pa_cfg_data));
@@ -177,6 +187,11 @@ static void mdss_mdp_kcal_update_pa(struct kcal_lut_data *lut_data)
 		pa_v2_config.flags = pa_v2_config.pa_v2_data.flags;
 
 		payload = kzalloc(sizeof(struct mdp_pa_data_v1_7),GFP_USER);
+		if (!payload) {
+			pr_err("%s: failed to allocate memory for update pa\n", __func__);
+			return -ENOMEM;
+		}
+
 		payload->mode = pa_v2_config.flags;
 		payload->global_hue_adj = lut_data->hue;
 		payload->global_sat_adj = lut_data->sat;
@@ -187,11 +202,14 @@ static void mdss_mdp_kcal_update_pa(struct kcal_lut_data *lut_data)
 		mdss_mdp_pa_v2_config(fb0_ctl->mfd, &pa_v2_config, &copyback);
 		kfree(payload);
 	}
+
+	return 0;
 }
 
 static ssize_t kcal_store(struct device *dev, struct device_attribute *attr,
 						const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_r, kcal_g, kcal_b, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -204,7 +222,10 @@ static ssize_t kcal_store(struct device *dev, struct device_attribute *attr,
 	lut_data->green = kcal_g;
 	lut_data->blue = kcal_b;
 
-	mdss_mdp_kcal_update_pcc(lut_data);
+	err = mdss_mdp_kcal_update_pcc(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -222,6 +243,7 @@ static ssize_t kcal_show(struct device *dev, struct device_attribute *attr,
 static ssize_t kcal_min_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_min, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -231,7 +253,10 @@ static ssize_t kcal_min_store(struct device *dev,
 
 	lut_data->minimum = kcal_min;
 
-	mdss_mdp_kcal_update_pcc(lut_data);
+	err = mdss_mdp_kcal_update_pcc(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -248,6 +273,7 @@ static ssize_t kcal_min_show(struct device *dev,
 static ssize_t kcal_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_enable, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -258,8 +284,14 @@ static ssize_t kcal_enable_store(struct device *dev,
 
 	lut_data->enable = kcal_enable;
 
-	mdss_mdp_kcal_update_pcc(lut_data);
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pcc(lut_data);
+	if (err < 0)
+		return err;
+
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -276,6 +308,7 @@ static ssize_t kcal_enable_show(struct device *dev,
 static ssize_t kcal_sat_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_sat, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -285,7 +318,10 @@ static ssize_t kcal_sat_store(struct device *dev,
 
 	lut_data->sat = kcal_sat;
 
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -302,6 +338,7 @@ static ssize_t kcal_sat_show(struct device *dev,
 static ssize_t kcal_hue_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_hue, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -311,7 +348,10 @@ static ssize_t kcal_hue_store(struct device *dev,
 
 	lut_data->hue = kcal_hue;
 
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -328,6 +368,7 @@ static ssize_t kcal_hue_show(struct device *dev,
 static ssize_t kcal_val_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_val, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -337,7 +378,10 @@ static ssize_t kcal_val_store(struct device *dev,
 
 	lut_data->val = kcal_val;
 
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -354,6 +398,7 @@ static ssize_t kcal_val_show(struct device *dev,
 static ssize_t kcal_cont_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+	int err = 0;
 	int kcal_cont, r;
 	struct kcal_lut_data *lut_data = dev_get_drvdata(dev);
 
@@ -363,7 +408,10 @@ static ssize_t kcal_cont_store(struct device *dev,
 
 	lut_data->cont = kcal_cont;
 
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	return count;
@@ -389,7 +437,7 @@ static DEVICE_ATTR(kcal_cont, S_IWUSR | S_IRUGO, kcal_cont_show,
 
 static int kcal_ctrl_probe(struct platform_device *pdev)
 {
-	int ret;
+	int ret = 0, err = 0;
 	struct kcal_lut_data *lut_data;
 
 	lut_data = devm_kzalloc(&pdev->dev, sizeof(*lut_data), GFP_KERNEL);
@@ -411,8 +459,14 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	lut_data->val = DEF_PA;
 	lut_data->cont = DEF_PA;
 
-	mdss_mdp_kcal_update_pcc(lut_data);
-	mdss_mdp_kcal_update_pa(lut_data);
+	err = mdss_mdp_kcal_update_pcc(lut_data);
+	if (err < 0)
+		return err;
+
+	err = mdss_mdp_kcal_update_pa(lut_data);
+	if (err < 0)
+		return err;
+
 	mdss_mdp_kcal_display_commit();
 
 	ret = device_create_file(&pdev->dev, &dev_attr_kcal);
@@ -422,12 +476,10 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	ret |= device_create_file(&pdev->dev, &dev_attr_kcal_hue);
 	ret |= device_create_file(&pdev->dev, &dev_attr_kcal_val);
 	ret |= device_create_file(&pdev->dev, &dev_attr_kcal_cont);
-	if (ret) {
+	if (ret)
 		pr_err("%s: unable to create sysfs entries\n", __func__);
-		return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
 static int kcal_ctrl_remove(struct platform_device *pdev)
