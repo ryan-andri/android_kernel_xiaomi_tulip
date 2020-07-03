@@ -1951,22 +1951,19 @@ int smblib_set_prop_input_suspend(struct smb_charger *chg,
 int lct_set_prop_input_suspend(struct smb_charger *chg,
 				  const union power_supply_propval *val)
 {
-	int rc = 0;
+	int rc;
 	union power_supply_propval pval = {0, };
 
 	pr_err("[%s] val=%d\n", __func__, val->intval);
-	if (val->intval) {
-		pval.intval = 0;
-		smblib_set_prop_input_suspend(chg, &pval);
-	} else {
-		pval.intval = 1;
+
+	pval.intval = val->intval ? 0 : 1;
+	if (!val->intval) {
 		chg->pl_psy =  power_supply_get_by_name("parallel");
-		if (chg->pl_psy) {
+		if (chg->pl_psy)
 			power_supply_set_property(chg->pl_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &pval);
-		}
-		smblib_set_prop_input_suspend(chg, &pval);
 	}
-	power_supply_changed(chg->batt_psy);
+
+	rc = smblib_set_prop_input_suspend(chg, &pval);
 	return rc;
 }
 #endif
