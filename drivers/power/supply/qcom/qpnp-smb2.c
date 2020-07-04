@@ -209,11 +209,8 @@ struct smb2 {
 	struct smb_dt_props	dt;
 	bool			bad_part;
 };
-#ifdef CONFIG_MACH_LONGCHEER
-static int __debug_mask = 0xFF;
-#else
+
 static int __debug_mask;
-#endif
 module_param_named(
 	debug_mask, __debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -2406,17 +2403,14 @@ static ssize_t lct_thermal_video_status_show(struct device *dev,
 static ssize_t lct_thermal_video_status_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	int retval;
 	unsigned int input;
 
 	if (sscanf(buf, "%u", &input) != 1)
-		retval = -EINVAL;
-	else
-	        LctIsInVideo = input;
+		return -EINVAL;
 
-	pr_err("LctIsInVideo = %d\n", LctIsInVideo);
+	LctIsInVideo = input;
 
-	return retval;
+	return count;
 }
 #endif
 
@@ -2429,17 +2423,14 @@ static ssize_t lct_thermal_call_status_show(struct device *dev,
 static ssize_t lct_thermal_call_status_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	int retval;
 	unsigned int input;
 
 	if (sscanf(buf, "%u", &input) != 1)
-		retval = -EINVAL;
-	else
-	        LctIsInCall = input;
+		return -EINVAL;
 
-	pr_err("IsInCall = %d\n", LctIsInCall);
+	LctIsInCall = input;
 
-	return retval;
+	return count;
 }
 
 static struct device_attribute attrs2[] = {
@@ -2673,7 +2664,7 @@ static int smb2_probe(struct platform_device *pdev)
 	}
 #ifdef CONFIG_MACH_LONGCHEER
 #ifdef THERMAL_CONFIG_FB
-	pr_info("enter sysfs create file thermal\n");
+	pr_debug("enter sysfs create file thermal\n");
 	for (attr_count2 = 0; attr_count2 < ARRAY_SIZE(attrs2); attr_count2++) {
 		rc = sysfs_create_file(&chg->dev->kobj,
 			&attrs2[attr_count2].attr);
