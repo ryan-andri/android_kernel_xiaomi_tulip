@@ -720,7 +720,7 @@ static int fg_get_battery_temp(struct fg_chip *chip, int *val)
 		if (quiet_them)
 			rc = thermal_zone_get_temp(quiet_them, &temp);
 		temp = (temp - 3) * 10;
-		pr_err("LCT USE QUIET_THERM AS BATTERY TEMP \n");
+		pr_debug("LCT USE QUIET_THERM AS BATTERY TEMP \n");
 	}
 #endif
 #endif
@@ -4023,14 +4023,14 @@ static int fg_bcl_reset(struct fg_chip *chip)
 	int i, ret, rc = 0;
 	u8 val, peek_mux;
 	bool success = false;
-	pr_err("FG_BCL_RESET START\n");
+	pr_debug("FG_BCL_RESET START\n");
 	/* Read initial value of peek mux1 */
 	rc = fg_read(chip, BATT_INFO_PEEK_MUX1(chip), &peek_mux, 1);
 	if (rc < 0) {
 		pr_err("Error in writing peek mux1, rc=%d\n", rc);
 		return rc;
 	}
-	pr_err("FG_BCL_RESET PEEK_MUX = %d\n",peek_mux);
+	pr_debug("FG_BCL_RESET PEEK_MUX = %d\n",peek_mux);
 	val = 0x83;
 	rc = fg_write(chip, BATT_INFO_PEEK_MUX1(chip), &val, 1);
 	if (rc < 0) {
@@ -4040,7 +4040,7 @@ static int fg_bcl_reset(struct fg_chip *chip)
 
 	mutex_lock(&chip->sram_rw_lock);
 	for (i = 0; i < BCL_RESET_RETRY_COUNT; i++) {
-		pr_err("FG_BCL_RESET RETRY\n");
+		pr_debug("FG_BCL_RESET RETRY\n");
 		rc = fg_dma_mem_req(chip, true);
 		if (rc < 0) {
 			pr_err("Error in locking memory, rc=%d\n", rc);
@@ -4052,9 +4052,9 @@ static int fg_bcl_reset(struct fg_chip *chip)
 			pr_err("Error in reading rdback, rc=%d\n", rc);
 			goto release_mem;
 		}
-		pr_err("FG_BCL_RESET VAL = %d\n",val);
+		pr_debug("FG_BCL_RESET VAL = %d\n",val);
 		if (val & PEEK_MUX1_BIT) {
-			pr_err("FG_BCL_RESET DEBUG\n");
+			pr_debug("FG_BCL_RESET DEBUG\n");
 			rc = fg_masked_write(chip, BATT_SOC_RST_CTRL0(chip),
 						BCL_RESET_BIT, BCL_RESET_BIT);
 			if (rc < 0) {
@@ -4085,7 +4085,7 @@ static int fg_bcl_reset(struct fg_chip *chip)
 				return rc;
 			}
 			success = false;
-			pr_err_ratelimited("PEEK_MUX1 not set retrying...\n");
+			pr_debug("PEEK_MUX1 not set retrying...\n");
 			msleep(1000);
 		}
 	}
