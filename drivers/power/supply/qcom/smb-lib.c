@@ -1951,22 +1951,19 @@ int smblib_set_prop_input_suspend(struct smb_charger *chg,
 int lct_set_prop_input_suspend(struct smb_charger *chg,
 				  const union power_supply_propval *val)
 {
-	int rc = 0;
+	int rc;
 	union power_supply_propval pval = {0, };
 
-	pr_err("[%s] val=%d\n", __func__, val->intval);
-	if (val->intval) {
-		pval.intval = 0;
-		smblib_set_prop_input_suspend(chg, &pval);
-	} else {
-		pval.intval = 1;
+	pr_debug("[%s] val=%d\n", __func__, val->intval);
+
+	pval.intval = val->intval ? 0 : 1;
+	if (!val->intval) {
 		chg->pl_psy =  power_supply_get_by_name("parallel");
-		if (chg->pl_psy) {
+		if (chg->pl_psy)
 			power_supply_set_property(chg->pl_psy, POWER_SUPPLY_PROP_INPUT_SUSPEND, &pval);
-		}
-		smblib_set_prop_input_suspend(chg, &pval);
 	}
-	power_supply_changed(chg->batt_psy);
+
+	rc = smblib_set_prop_input_suspend(chg, &pval);
 	return rc;
 }
 #endif
@@ -2004,7 +2001,7 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 		return -EINVAL;
 #ifdef CONFIG_MACH_LONGCHEER
 #ifdef THERMAL_CONFIG_FB
-	pr_err("smblib_set_prop_system_temp_level val=%d, chg->system_temp_level=%d, LctThermal=%d, lct_backlight_off= %d, IsInCall=%d, hwc_check_india=%d\n ", 
+	pr_debug("smblib_set_prop_system_temp_level val=%d, chg->system_temp_level=%d, LctThermal=%d, lct_backlight_off= %d, IsInCall=%d, hwc_check_india=%d\n ", 
 		val->intval,chg->system_temp_level, LctThermal, lct_backlight_off, LctIsInCall, hwc_check_india);
 
 	if (LctThermal == 0)
@@ -3308,14 +3305,14 @@ int smblib_get_charge_current(struct smb_charger *chg,
 	/* QC 3.0 adapter */
 	if (apsd_result->bit & QC_3P0_BIT) {
 		*total_current_ua = HVDCP_CURRENT_UA;
-		pr_info("QC3.0 set icl to 2.9A\n");
+		pr_debug("QC3.0 set icl to 2.9A\n");
 		return 0;
 	}
 
 	/* QC 2.0 adapter */
 	if (apsd_result->bit & QC_2P0_BIT) {
 		*total_current_ua = HVDCP2_CURRENT_UA;
-		pr_info("QC2.0 set icl to 1.5A\n");
+		pr_debug("QC2.0 set icl to 1.5A\n");
 		return 0;
 	}
 #else
@@ -4080,7 +4077,7 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 	}
 #ifdef CONFIG_MACH_LONGCHEER
 	if (chg->float_rerun_apsd) {
-		smblib_err(chg, "rerun apsd for float type\n");
+		pr_debug("rerun apsd for float type\n");
 		rc = smblib_get_prop_usb_present(chg, &pval);
 		if (rc < 0) {
 			smblib_err(chg, "Couldn't get usb present rc = %d\n", rc);
@@ -4100,7 +4097,7 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 			vote(chg->usb_icl_votable, LEGACY_UNKNOWN_VOTER, true, 500000);
 #endif
 			chg->float_rerun_apsd = false;
-			smblib_err(chg, "rerun apsd still float\n");
+			pr_debug("rerun apsd still float\n");
 		}
 	}
 #endif
@@ -4114,7 +4111,6 @@ bool smblib_check_charge_type(struct smb_charger *chg )
 	const struct apsd_result *apsd_result = smblib_get_apsd_result(chg);
 	enum power_supply_type real_charger_type = apsd_result->pst;
 
-	smblib_dbg(chg, PR_REGISTER, "real_charger_type = 0x%02x\n", real_charger_type);
 	if(POWER_SUPPLY_TYPE_USB <= real_charger_type && POWER_SUPPLY_TYPE_USB_PD >= real_charger_type)
 		ret = true;
 	return ret;
