@@ -61,9 +61,10 @@ static ssize_t power_supply_show_property(struct device *dev,
 		"Unspecified failure", "Cold", "Watchdog timer expire",
 		"Safety timer expire",
 #ifdef CONFIG_MACH_LONGCHEER
-		"Low_Cool",
-#endif
+		"Warm", "Cool", "Hot", "Low_Cool"
+#else
 		"Warm", "Cool", "Hot"
+#endif
 	};
 	static char *technology_text[] = {
 		"Unknown", "NiMH", "Li-ion", "Li-poly", "LiFe", "NiCd",
