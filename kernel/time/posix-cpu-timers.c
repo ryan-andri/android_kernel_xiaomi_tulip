@@ -1057,7 +1057,10 @@ void posix_cpu_timer_schedule(struct k_itimer *timer)
 	 * Fetch the current sample and update the timer's expiry time.
 	 */
 	if (CPUCLOCK_PERTHREAD(timer->it_clock)) {
-		cpu_clock_sample(timer->it_clock, p, &now);
+		if (unlikely(cpu_clock_sample(timer->it_clock, p, &now))) {
+			timer->it.cpu.expires = 0;
+			goto out;
+		}
 		bump_cpu_timer(timer, now);
 		if (unlikely(p->exit_state))
 			goto out;
@@ -1253,10 +1256,8 @@ void set_process_cpu_timer(struct task_struct *tsk, unsigned int clock_idx,
 	unsigned long long now = 0;
 
 	WARN_ON_ONCE(clock_idx == CPUCLOCK_SCHED);
-	if (cpu_timer_sample_group(clock_idx, tsk, &now))
-		return;
 
-	if (oldval) {
+	if (oldval && cpu_timer_sample_group(clock_idx, tsk, &now) != -EINVAL) {
 		/*
 		 * We are setting itimer. The *oldval is absolute and we update
 		 * it to be relative, *newval argument is relative and we update
