@@ -442,6 +442,15 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		else if (desc->action && desc->action->name)
 			name = desc->action->name;
 
+#ifdef CONFIG_MACH_LONGCHEER
+		/* irq 75 :rpm interrupt
+		** irq 12 :spmi interrupt
+		** irq 199:pinctrl interrupt
+		*/
+		if (75 == irq || 12 == irq || 199 == irq)
+			continue;
+#endif
+
 		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
 	}
 }
