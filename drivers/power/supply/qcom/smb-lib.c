@@ -2746,13 +2746,7 @@ int smblib_set_prop_pd_current_max(struct smb_charger *chg,
 
 	return rc;
 }
-#ifdef CONFIG_MACH_LONGCHEER
-#if defined(CONFIG_MACH_XIAOMI_WHYRED)
-#define FLOAT_CURRENT_UA		500000
-#else
-#define FLOAT_CURRENT_UA		1000000
-#endif
-#endif
+
 static int smblib_handle_usb_current(struct smb_charger *chg,
 					int usb_current)
 {
@@ -2765,11 +2759,7 @@ static int smblib_handle_usb_current(struct smb_charger *chg,
 			 * of Rp
 			 */
 			typec_mode = smblib_get_prop_typec_mode(chg);
-#ifdef CONFIG_MACH_LONGCHEER
-			rp_ua = FLOAT_CURRENT_UA;
-#else
 			rp_ua = get_rp_based_dcp_current(chg, typec_mode);
-#endif
 			rc = vote(chg->usb_icl_votable, LEGACY_UNKNOWN_VOTER,
 								true, rp_ua);
 			if (rc < 0)
