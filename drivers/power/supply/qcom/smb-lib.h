@@ -68,9 +68,6 @@ enum print_reason {
 #define WBC_VOTER			"WBC_VOTER"
 #define OV_VOTER			"OV_VOTER"
 #define FCC_STEPPER_VOTER		"FCC_STEPPER_VOTER"
-#ifdef CONFIG_MACH_LONGCHEER
-#define THERMAL_CONFIG_FB 1
-#endif
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
 #define BOOST_BACK_STORM_COUNT	3
@@ -268,8 +265,18 @@ struct smb_charger {
 	struct power_supply		*usb_port_psy;
 	enum power_supply_type		real_charger_type;
 #ifdef CONFIG_MACH_LONGCHEER
-	struct power_supply             *pl_psy;
+	struct power_supply		*pl_psy;
+#if defined(CONFIG_FB)
+	struct notifier_block		lct_notifier;
+	struct work_struct		lct_fb_notify_work;
+	bool			lcd_is_off;
+	int			device_in_call;
+#ifdef CONFIG_MACH_XIAOMI_WAYNE
+	int			device_in_video;
 #endif
+#endif
+#endif
+
 	/* notifiers */
 	struct notifier_block	nb;
 
@@ -355,12 +362,6 @@ struct smb_charger {
 	bool			use_extcon;
 	bool			otg_present;
 	bool			fcc_stepper_mode;
-#ifdef CONFIG_MACH_LONGCHEER
-#ifdef THERMAL_CONFIG_FB
-	struct notifier_block notifier;
-	struct work_struct fb_notify_work;
-#endif
-#endif
 	/* workaround flag */
 	u32			wa_flags;
 	bool			cc2_detach_wa_active;

@@ -1976,21 +1976,18 @@ int smblib_set_prop_batt_capacity(struct smb_charger *chg,
 
 	return 0;
 }
-#ifdef CONFIG_MACH_LONGCHEER
-#ifdef THERMAL_CONFIG_FB
-extern union power_supply_propval lct_therm_lvl_reserved;
-extern bool lct_backlight_off;
-extern int LctIsInCall;
-#if defined(CONFIG_MACH_XIAOMI_WAYNE)
-extern int LctIsInVideo;
-#endif
-extern int LctThermal;
-extern int hwc_check_india;
-#endif
-#endif
+
 int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 				const union power_supply_propval *val)
 {
+#ifdef CONFIG_MACH_LONGCHEER
+#ifdef CONFIG_FB
+	union power_supply_propval battery_temp;
+	bool is_batt_hot;
+#endif
+	int override_val;
+#endif
+
 	if (val->intval < 0)
 		return -EINVAL;
 
@@ -1999,64 +1996,64 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 
 	if (val->intval > chg->thermal_levels)
 		return -EINVAL;
-#ifdef CONFIG_MACH_LONGCHEER
-#ifdef THERMAL_CONFIG_FB
-	pr_debug("smblib_set_prop_system_temp_level val=%d, chg->system_temp_level=%d, LctThermal=%d, lct_backlight_off= %d, IsInCall=%d, hwc_check_india=%d\n ", 
-		val->intval,chg->system_temp_level, LctThermal, lct_backlight_off, LctIsInCall, hwc_check_india);
 
-	if (LctThermal == 0)
+#ifdef CONFIG_MACH_LONGCHEER
+	override_val = val->intval; /* val->intval is read-only object */
+#ifdef CONFIG_FB
+	if (smblib_get_prop_from_bms(chg, POWER_SUPPLY_PROP_TEMP, &battery_temp) < 0) {
+		battery_temp.intval = 0;
+		pr_err("%s: error to get battery temp\n", __func__);
+	}
+
+	is_batt_hot = (battery_temp.intval < 460) ? false : true;
+
+	if (!is_batt_hot) {
+		if ((override_val > 3) && !chg->device_in_call)
+			return 0;
+
+		if ((override_val > 2) && chg->lcd_is_off && !chg->device_in_call)
+			return 0;
+
 #ifdef CONFIG_MACH_XIAOMI_WAYNE
-		if (val->intval < 6)
-#endif
-		lct_therm_lvl_reserved.intval = val->intval;
-#ifdef CONFIG_MACH_XIAOMI_WHYRED
-		if (hwc_check_india) {
-			if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 2))
-				return 0;
-		} else {
-			if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 1))
-				return 0;
-		}
-#elif defined(CONFIG_MACH_XIAOMI_WAYNE)
-	if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 2))
-		    return 0;
-#elif defined(CONFIG_MACH_XIAOMI_TULIP)
-	if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 3))
-		return 0;
+		if ((chg->device_in_call || chg->device_in_video) && (override_val != 3))
 #else
-	if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 0) && (hwc_check_india == 0))
-	    return 0;
-	if ((lct_backlight_off) && (LctIsInCall == 0) && (val->intval > 1) && (hwc_check_india == 1))
-	    return 0;
+		if (chg->device_in_call && (override_val != 4))
 #endif
-#if defined(CONFIG_MACH_XIAOMI_WHYRED) || defined(CONFIG_MACH_XIAOMI_WAYNE)
-	if ((LctIsInCall == 1) && (val->intval != 4))
+			return 0;
+	} else {
+		/* set fcc current to 1500mah to avoid overheat. */
+		if (override_val > 4) {
+			if (chg->lcd_is_off)
+#ifdef CONFIG_MACH_XIAOMI_WAYNE
+				override_val = 2;
+#else
+				override_val = 3;
+#endif
+			else
+#ifdef CONFIG_MACH_XIAOMI_WAYNE
+				override_val = 3;
+#else
+				override_val = 4;
+#endif
+		}
+	}
+
+	/* exit if new values equal with system_temp_level */
+	if (override_val == chg->system_temp_level)
 		return 0;
-#elif defined(CONFIG_MACH_XIAOMI_TULIP)
-	if ((LctIsInCall == 1) && (val->intval != 5))
-		return 0;
 #endif
-#if defined(CONFIG_MACH_XIAOMI_WAYNE)
-	if ((LctIsInVideo == 1) && (val->intval != 6) && (lct_backlight_off == 0) && (hwc_check_india == 1))
-	    return 0;
-#endif
-	if (val->intval == chg->system_temp_level)
-		return 0;
-#endif
-#endif
+	chg->system_temp_level = override_val;
+#else
 	chg->system_temp_level = val->intval;
+#endif
+
 	/* disable parallel charge in case of system temp level */
 #ifdef CONFIG_MACH_LONGCHEER
-	if((lct_backlight_off == 0) && (chg->system_temp_level <= 1))
-		vote(chg->pl_disable_votable, THERMAL_DAEMON_VOTER,false,0);
-#if defined(CONFIG_MACH_XIAOMI_WHYRED)
-	else if((hwc_check_india == 0) && (chg->system_temp_level <= 2))
-		vote(chg->pl_disable_votable, THERMAL_DAEMON_VOTER,false,0);
-#elif defined (CONFIG_MACH_XIAOMI_TULIP)
-	else if(chg->system_temp_level <= 2)
-		vote(chg->pl_disable_votable, THERMAL_DAEMON_VOTER,false,0);
-#endif
+#ifdef CONFIG_FB
+	if (chg->lcd_is_off && (chg->system_temp_level <= 2) && !is_batt_hot)
+		vote(chg->pl_disable_votable, THERMAL_DAEMON_VOTER, false, 0);
 	else
+#endif
 #endif
 	vote(chg->pl_disable_votable, THERMAL_DAEMON_VOTER,
 			chg->system_temp_level ? true : false, 0);
