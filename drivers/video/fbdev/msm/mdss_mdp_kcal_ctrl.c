@@ -24,7 +24,7 @@
 
 #include "mdss_mdp.h"
 
-#define DEF_PCC 0x100
+#define DEF_PCC 0xdc
 #define DEF_PA 0xff
 #define PCC_ADJ 0x80
 
@@ -409,9 +409,9 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	lut_data->red = DEF_PCC;
 	lut_data->green = DEF_PCC;
 	lut_data->blue = DEF_PCC;
-	lut_data->minimum = 0x23;
+	lut_data->minimum = 0x28;
 	lut_data->hue = 0x0;
-	lut_data->sat = DEF_PA;
+	lut_data->sat = 0x104;
 	lut_data->val = DEF_PA;
 	lut_data->cont = DEF_PA;
 
